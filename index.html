@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Five Crowns Scorekeeper</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#4b2e83">
+
+<style>
+* { box-sizing: border-box; }
+
+:root {
+  --bg1: #4b2e83;
+  --bg2: #7c4dff;
+  --text: white;
+  --table-bg: white;
+  --table-text: black;
+}
+
+body.dark {
+  --bg1: #111;
+  --bg2: #333;
+  --text: #eee;
+  --table-bg: #222;
+  --table-text: #eee;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, var(--bg1), var(--bg2));
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+h1 { text-align: center; margin: 8px 0; font-size: 1.4rem; }
+
+.controls {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px;
+}
+
+input, button {
+  padding: 6px;
+  border-radius: 8px;
+  border: none;
+  font-size: 0.9rem;
+}
+
+button { background: gold; font-weight: bold; cursor: pointer; }
+
+.table-wrapper { flex: 1; overflow: auto; padding: 4px; }
+
+.desktop table { font-size: 0.9rem; }
+.mobile table { font-size: 0.7rem; }
+
+.table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--table-bg);
+  color: var(--table-text);
+  table-layout: fixed;
+}
+
+th, td {
+  border: 1px solid #999;
+  padding: 4px;
+  text-align: center;
+}
+
+th { position: sticky; top: 0; background: #ddd; }
+
+.round-label { font-weight: bold; background: #ccc; }
+
+.winner { background: #ff4d4d !important; position: relative; color: white; }
+
+.total { font-weight: bold; background: #ffe082; }
+
+.toggle-row { text-align: center; font-size: 0.75rem; }
+
+.crown-icon {
+  display: block;
+  font-size: 1rem;
+}
+</style>
+</head>
+<body class="desktop">
+
+<h1>Five Crowns</h1>
+
+<div class="controls">
+  <input type="text" id="playerName" placeholder="Player name" />
+  <button onclick="addPlayer()">Add</button>
+  <button onclick="playAgain()">Play Again</button>
+  <button onclick="showHistory()">History</button>
+  <button onclick="resetGame()">Reset All</button>
+  <button onclick="toggleDarkMode()">Dark Mode</button>
+  <button onclick="toggleDevice()">Toggle Device</button>
+</div>
+
+<div class="toggle-row" id="deviceLabel"></div>
+
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr id="headerRow"><th>Round</th></tr>
+    </thead>
+    <tbody id="scoreBody"></tbody>
+  </table>
+</div>
+
+<script>
+const rounds = ["3","4","5","6","7","8","9","10","J","Q","K"];
+const players = JSON.parse(localStorage.getItem("fiveCrownsPlayers")) || [];
+const history = JSON.parse(localStorage.getItem("fiveCrownsHistory")) || [];
+
+const headerRow = document.getElementById("headerRow");
+const scoreBody = document.getElementById("scoreBody");
+const deviceLabel = document.getElementById("deviceLabel");
+
+function saveGame() {
+  localStorage.setItem("fiveCrownsPlayers", JSON.stringify(players));
+  localStorage.setItem("fiveCrownsHistory", JSON.stringify(history));
+}
+
+function addPlayer() {
+  const input = document.getElementById("playerName");
+  const name = input.value.trim();
+  if (!name) return;
+  players.push({ name, scores: Array(11).fill("") });
+  input.value = "";
+  saveGame();
+  render();
+}
+
+function render() {
+  headerRow.innerHTML = "<th>Round</th>";
+  const totals = players.map(p => calculatePlayerTotal(p));
+  const lowest = totals.length ? Math.min(...totals) : null;
+
+  players.forEach((player, pIndex) => {
+    const th = document.createElement("th");
+    if (totals[pIndex] === lowest && lowest !== 0) {
+      const crown = document.createElement("span");
+      crown.textContent = "👑";
+      crown.className = "crown-icon";
+      th.appendChild(crown);
+      th.classList.add("winner");
+    }
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = player.name;
+    nameSpan.contentEditable = true;
+    nameSpan.onblur = function() {
+      players[pIndex].name = this.textContent.trim() || "Player";
+      saveGame();
+      render();
+    };
+    const deleteBtn = document.createElement("button");
+    deleteBtn.textContent = "✕";
+    deleteBtn.style.marginLeft = "4px";
+    deleteBtn.style.background = "gold";
+    deleteBtn.style.color = "black";
+    deleteBtn.style.fontSize = "0.7rem";
+    deleteBtn.onclick = function() {
+      players.splice(pIndex, 1);
+      saveGame();
+      render();
+    };
+    th.appendChild(nameSpan);
+    th.appendChild(deleteBtn);
+    headerRow.appendChild(th);
+  });
+
+  scoreBody.innerHTML = "";
+
+  rounds.forEach((round, rIndex) => {
+    const row = document.createElement("tr");
+    const roundCell = document.createElement("td");
+    roundCell.textContent = round;
+    roundCell.className = "round-label";
+    row.appendChild(roundCell);
+
+    players.forEach((player, pIndex) => {
+      const cell = document.createElement("td");
+      const input = document.createElement("input");
+      input.type = "number";
+      input.min = "0";
+      input.value = player.scores[rIndex];
+      input.style.width = "100%";
+      input.oninput = function() {
+        players[pIndex].scores[rIndex] = this.value;
+        saveGame();
+        render();
+      };
+      cell.appendChild(input);
+      row.appendChild(cell);
+    });
+
+    scoreBody.appendChild(row);
+  });
+
+  const totalRow = document.createElement("tr");
+  const labelCell = document.createElement("td");
+  labelCell.textContent = "TOTAL";
+  labelCell.className = "round-label";
+  totalRow.appendChild(labelCell);
+
+  players.forEach(player => {
+    const totalCell = document.createElement("td");
+    totalCell.className = "total";
+    totalCell.textContent = calculatePlayerTotal(player);
+    totalRow.appendChild(totalCell);
+  });
+
+  scoreBody.appendChild(totalRow);
+}
+
+function calculatePlayerTotal(player) {
+  return player.scores.reduce((sum, val) => sum + (Number(val) || 0), 0);
+}
+
+function playAgain() {
+  if (players.length) {
+    history.push({
+      date: new Date().toLocaleString(),
+      players: JSON.parse(JSON.stringify(players))
+    });
+  }
+  players.forEach(p => p.scores = Array(11).fill(""));
+  saveGame();
+  render();
+}
+
+function showHistory() {
+  if (!history.length) return alert("No saved games yet.");
+  let message = "Saved Games:\n";
+  history.forEach((game, index) => {
+    message += `${index + 1}. ${game.date}\n`;
+  });
+  const choice = prompt(message + "\nEnter number to restore:");
+  const gameIndex = Number(choice) - 1;
+  if (history[gameIndex]) {
+    players.length = 0;
+    history[gameIndex].players.forEach(p => players.push(p));
+    saveGame();
+    render();
+  }
+}
+
+function resetGame() {
+  if (!confirm("Reset everything? This deletes all players.")) return;
+  localStorage.clear();
+  players.length = 0;
+  history.length = 0;
+  render();
+}
+
+function toggleDarkMode() {
+  document.body.classList.toggle("dark");
+}
+
+function toggleDevice() {
+  if (document.body.classList.contains("desktop")) {
+    document.body.classList.remove("desktop");
+    document.body.classList.add("mobile");
+    deviceLabel.textContent = "Mobile Layout";
+  } else {
+    document.body.classList.remove("mobile");
+    document.body.classList.add("desktop");
+    deviceLabel.textContent = "Desktop Layout";
+  }
+}
+
+if (window.innerWidth < 768) {
+  document.body.classList.remove("desktop");
+  document.body.classList.add("mobile");
+  deviceLabel.textContent = "Mobile Layout (auto)";
+} else {
+  deviceLabel.textContent = "Desktop Layout (auto)";
+}
+
+render();
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+
+</body>
+</html>
