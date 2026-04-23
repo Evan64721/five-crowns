@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Five Crowns Scorekeeper</title>
 
 <style>
@@ -70,7 +70,6 @@ th {
   background: #ddd;
   position: sticky;
   top: 0;
-  cursor: grab;
 }
 
 .total {
@@ -83,10 +82,10 @@ th {
   color: white;
 }
 
-input[type="number"] {
+input {
   width: 100%;
-  text-align: right;
   font-size: 1rem;
+  text-align: right;
 }
 </style>
 </head>
@@ -102,42 +101,26 @@ input[type="number"] {
 </div>
 
 <div class="table-wrapper">
-  <table>
-    <thead>
-      <tr id="headerRow">
-        <th>Round</th>
-      </tr>
-    </thead>
-    <tbody id="scoreBody"></tbody>
+  <table id="table">
+    <thead id="thead"></thead>
+    <tbody id="tbody"></tbody>
   </table>
 </div>
 
 <script>
 const rounds = ["3","4","5","6","7","8","9","10","J","Q","K"];
+
 let players = JSON.parse(localStorage.getItem("players")) || [];
 
-const headerRow = document.getElementById("headerRow");
-const scoreBody = document.getElementById("scoreBody");
+const thead = document.getElementById("thead");
+const tbody = document.getElementById("tbody");
 
 function save() {
   localStorage.setItem("players", JSON.stringify(players));
 }
 
-function addPlayer() {
-  if (players.length >= 6) {
-    alert("Maximum 6 players.");
-    return;
-  }
-  const name = prompt("Player name:");
-  if (!name) return;
-
-  players.push({ name, scores: Array(11).fill("") });
-  save();
-  render();
-}
-
-function calculateTotal(player) {
-  return player.scores.reduce((s, v) => s + (Number(v) || 0), 0);
+function calculateTotal(p) {
+  return p.scores.reduce((a,v) => a + (Number(v) || 0), 0);
 }
 
 function getLowest() {
@@ -145,12 +128,42 @@ function getLowest() {
   return totals.length ? Math.min(...totals) : null;
 }
 
+function addPlayer() {
+  const name = prompt("Player name?");
+  if (!name) return;
+
+  players.push({
+    name,
+    scores: Array(11).fill("")
+  });
+
+  save();
+  render();
+}
+
+function updateCell(i, r, value) {
+  players[i].scores[r] = value;
+  save();
+
+  // only update totals (NO full re-render)
+  renderTotals();
+}
+
 function render() {
-  headerRow.innerHTML = "<th>Round</th>";
+  renderHeader();
+  renderBody();
+  renderTotals();
+}
 
-  const lowest = getLowest();
+function renderHeader() {
+  thead.innerHTML = "";
 
-  // HEADER (drag works)
+  const row = document.createElement("tr");
+
+  const roundCell = document.createElement("th");
+  roundCell.textContent = "Round";
+  row.appendChild(roundCell);
+
   players.forEach((p, i) => {
     const th = document.createElement("th");
     th.textContent = p.name;
@@ -163,7 +176,6 @@ function render() {
     th.addEventListener("dragover", e => e.preventDefault());
 
     th.addEventListener("drop", e => {
-      e.preventDefault();
       const from = Number(e.dataTransfer.getData("from"));
       const to = i;
 
@@ -176,70 +188,62 @@ function render() {
       render();
     });
 
-    const total = calculateTotal(p);
-    if (total === lowest && lowest !== null) {
-      th.classList.add("winner");
-    }
-
-    headerRow.appendChild(th);
+    row.appendChild(th);
   });
 
-  scoreBody.innerHTML = "";
+  thead.appendChild(row);
+}
 
-  // BODY
-  rounds.forEach((round, r) => {
+function renderBody() {
+  tbody.innerHTML = "";
+
+  rounds.forEach((r, rowIndex) => {
     const row = document.createElement("tr");
 
     const label = document.createElement("td");
-    label.textContent = round;
+    label.textContent = r;
     row.appendChild(label);
 
-    players.forEach((p, i) => {
+    players.forEach((p, playerIndex) => {
       const cell = document.createElement("td");
+
       const input = document.createElement("input");
-
       input.type = "number";
-      input.value = p.scores[r] ?? "";
+      input.value = p.scores[rowIndex] ?? "";
 
-      // ✅ FIX: no render here
       input.addEventListener("input", () => {
-        players[i].scores[r] = input.value;
-        save();
+        updateCell(playerIndex, rowIndex, input.value);
       });
 
-      // ✅ Move to next input on Enter
       input.addEventListener("keydown", e => {
         if (e.key === "Enter") {
-          const inputs = Array.from(document.querySelectorAll("input"));
-          const index = inputs.indexOf(input);
-
-          if (inputs[index + 1]) {
-            inputs[index + 1].focus();
-          }
-
+          const inputs = [...document.querySelectorAll("input")];
+          const i = inputs.indexOf(input);
+          if (inputs[i + 1]) inputs[i + 1].focus();
           input.blur();
-          render(); // update totals AFTER moving
         }
-      });
-
-      // ✅ Also update when leaving field
-      input.addEventListener("blur", () => {
-        render();
       });
 
       cell.appendChild(input);
       row.appendChild(cell);
     });
 
-    scoreBody.appendChild(row);
+    tbody.appendChild(row);
   });
+}
 
-  // TOTAL ROW
-  const totalRow = document.createElement("tr");
+function renderTotals() {
+  const old = document.getElementById("totalsRow");
+  if (old) old.remove();
+
+  const lowest = getLowest();
+
+  const row = document.createElement("tr");
+  row.id = "totalsRow";
 
   const label = document.createElement("td");
   label.textContent = "TOTAL";
-  totalRow.appendChild(label);
+  row.appendChild(label);
 
   players.forEach(p => {
     const td = document.createElement("td");
@@ -252,10 +256,10 @@ function render() {
       td.classList.add("winner");
     }
 
-    totalRow.appendChild(td);
+    row.appendChild(td);
   });
 
-  scoreBody.appendChild(totalRow);
+  tbody.appendChild(row);
 }
 
 function playAgain() {
