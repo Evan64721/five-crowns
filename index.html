@@ -5,7 +5,90 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Five Crowns Scorekeeper</title>
 
-<link rel="stylesheet" href="style.css" />
+<style>
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: linear-gradient(135deg, #4b2e83, #7c4dff);
+  color: white;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+h1 {
+  text-align: center;
+  margin: 10px 0;
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px;
+}
+
+button {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  font-weight: bold;
+  background: gold;
+  cursor: pointer;
+}
+
+.table-wrapper {
+  flex: 1;
+  overflow: auto;
+  padding: 6px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: white;
+  color: black;
+}
+
+th, td {
+  border: 1px solid #999;
+  padding: 6px;
+  text-align: right;
+}
+
+th:first-child,
+td:first-child {
+  text-align: left;
+  font-weight: bold;
+}
+
+th {
+  background: #ddd;
+  position: sticky;
+  top: 0;
+  cursor: grab;
+}
+
+.total {
+  background: #ffe082;
+  font-weight: bold;
+}
+
+.winner {
+  background: #ff4d4d !important;
+  color: white;
+}
+
+input[type="number"] {
+  width: 100%;
+  text-align: right;
+  font-size: 1rem;
+}
+</style>
 </head>
 
 <body>
@@ -29,12 +112,153 @@
   </table>
 </div>
 
-<script src="script.js"></script>
+<script>
+const rounds = ["3","4","5","6","7","8","9","10","J","Q","K"];
+let players = JSON.parse(localStorage.getItem("players")) || [];
+
+const headerRow = document.getElementById("headerRow");
+const scoreBody = document.getElementById("scoreBody");
+
+function save() {
+  localStorage.setItem("players", JSON.stringify(players));
+}
+
+function addPlayer() {
+  if (players.length >= 6) {
+    alert("Maximum 6 players.");
+    return;
+  }
+  const name = prompt("Player name:");
+  if (!name) return;
+
+  players.push({ name, scores: Array(11).fill("") });
+  save();
+  render();
+}
+
+function calculateTotal(player) {
+  return player.scores.reduce((s, v) => s + (Number(v) || 0), 0);
+}
+
+function getLowest() {
+  const totals = players.map(calculateTotal);
+  return totals.length ? Math.min(...totals) : null;
+}
+
+function render() {
+  headerRow.innerHTML = "<th>Round</th>";
+
+  const lowest = getLowest();
+
+  // ===== HEADER (with drag reorder) =====
+  players.forEach((p, i) => {
+    const th = document.createElement("th");
+    th.textContent = p.name;
+    th.draggable = true;
+
+    th.addEventListener("dragstart", e => {
+      e.dataTransfer.setData("from", i);
+    });
+
+    th.addEventListener("dragover", e => {
+      e.preventDefault();
+    });
+
+    th.addEventListener("drop", e => {
+      e.preventDefault();
+      const from = Number(e.dataTransfer.getData("from"));
+      const to = i;
+
+      if (from === to) return;
+
+      const moved = players.splice(from, 1)[0];
+      players.splice(to, 0, moved);
+
+      save();
+      render();
+    });
+
+    const total = calculateTotal(p);
+
+    if (total === lowest && lowest !== null) {
+      th.classList.add("winner");
+    }
+
+    headerRow.appendChild(th);
+  });
+
+  // ===== BODY =====
+  scoreBody.innerHTML = "";
+
+  rounds.forEach((round, r) => {
+    const row = document.createElement("tr");
+
+    const label = document.createElement("td");
+    label.textContent = round;
+    row.appendChild(label);
+
+    players.forEach((p, i) => {
+      const cell = document.createElement("td");
+      const input = document.createElement("input");
+
+      input.type = "number";
+      input.value = p.scores[r] ?? "";
+
+      input.addEventListener("input", () => {
+        players[i].scores[r] = input.value;
+        save();
+        render();
+      });
+
+      cell.appendChild(input);
+      row.appendChild(cell);
+    });
+
+    scoreBody.appendChild(row);
+  });
+
+  // ===== TOTAL ROW =====
+  const totalRow = document.createElement("tr");
+
+  const label = document.createElement("td");
+  label.textContent = "TOTAL";
+  totalRow.appendChild(label);
+
+  players.forEach(p => {
+    const td = document.createElement("td");
+    const total = calculateTotal(p);
+
+    td.textContent = total;
+    td.className = "total";
+
+    if (total === lowest && lowest !== null) {
+      td.classList.add("winner");
+    }
+
+    totalRow.appendChild(td);
+  });
+
+  scoreBody.appendChild(totalRow);
+}
+
+function playAgain() {
+  players.forEach(p => p.scores = Array(11).fill(""));
+  save();
+  render();
+}
+
+function resetGame() {
+  if (!confirm("Reset everything?")) return;
+  players = [];
+  localStorage.removeItem("players");
+  render();
+}
+
+render();
+</script>
+
 </body>
-</html>  border: none;
-  font-weight: bold;
-  background: gold;
-  cursor: pointer;
+</html>  cursor: pointer;
 }
 
 .table-wrapper {
