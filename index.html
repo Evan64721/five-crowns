@@ -5,36 +5,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Five Crowns Scorekeeper</title>
 
-<style>
-* { box-sizing: border-box; }
+<link rel="stylesheet" href="style.css" />
+</head>
 
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: linear-gradient(135deg, #4b2e83, #7c4dff);
-  color: white;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
+<body>
 
-h1 {
-  text-align: center;
-  margin: 10px 0;
-}
+<h1>Five Crowns</h1>
 
-.controls {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 6px;
-}
+<div class="controls">
+  <button onclick="addPlayer()">Add Player</button>
+  <button onclick="playAgain()">Play Again</button>
+  <button onclick="resetGame()">Reset</button>
+</div>
 
-button {
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: none;
+<div class="table-wrapper">
+  <table>
+    <thead>
+      <tr id="headerRow">
+        <th>Round</th>
+      </tr>
+    </thead>
+    <tbody id="scoreBody"></tbody>
+  </table>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>  border: none;
   font-weight: bold;
   background: gold;
   cursor: pointer;
