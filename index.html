@@ -150,7 +150,7 @@ function render() {
 
   const lowest = getLowest();
 
-  // ===== HEADER (with drag reorder) =====
+  // HEADER (with drag)
   players.forEach((p, i) => {
     const th = document.createElement("th");
     th.textContent = p.name;
@@ -160,9 +160,7 @@ function render() {
       e.dataTransfer.setData("from", i);
     });
 
-    th.addEventListener("dragover", e => {
-      e.preventDefault();
-    });
+    th.addEventListener("dragover", e => e.preventDefault());
 
     th.addEventListener("drop", e => {
       e.preventDefault();
@@ -187,7 +185,7 @@ function render() {
     headerRow.appendChild(th);
   });
 
-  // ===== BODY =====
+  // BODY
   scoreBody.innerHTML = "";
 
   rounds.forEach((round, r) => {
@@ -217,7 +215,7 @@ function render() {
     scoreBody.appendChild(row);
   });
 
-  // ===== TOTAL ROW =====
+  // TOTAL ROW
   const totalRow = document.createElement("tr");
 
   const label = document.createElement("td");
@@ -251,190 +249,6 @@ function resetGame() {
   if (!confirm("Reset everything?")) return;
   players = [];
   localStorage.removeItem("players");
-  render();
-}
-
-render();
-</script>
-
-</body>
-</html>  cursor: pointer;
-}
-
-.table-wrapper {
-  flex: 1;
-  overflow: auto;
-  padding: 6px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed; /* keeps size stable */
-  background: white;
-  color: black;
-}
-
-th, td {
-  border: 1px solid #999;
-  padding: 6px;
-  text-align: right; /* numbers align right */
-}
-
-th:first-child,
-td:first-child {
-  text-align: left;
-  font-weight: bold;
-}
-
-th {
-  background: #ddd;
-  position: sticky;
-  top: 0;
-}
-
-.total {
-  background: #ffe082;
-  font-weight: bold;
-}
-
-.winner {
-  background: #ff4d4d !important;
-  color: white;
-}
-
-input[type="number"] {
-  width: 100%;
-  text-align: right;
-  font-size: 1rem;
-}
-</style>
-</head>
-
-<body>
-
-<h1>Five Crowns</h1>
-
-<div class="controls">
-  <button onclick="addPlayer()">Add Player</button>
-  <button onclick="playAgain()">Play Again</button>
-  <button onclick="resetGame()">Reset</button>
-</div>
-
-<div class="table-wrapper">
-  <table>
-    <thead>
-      <tr id="headerRow">
-        <th>Round</th>
-      </tr>
-    </thead>
-    <tbody id="scoreBody"></tbody>
-  </table>
-</div>
-
-<script>
-const rounds = ["3","4","5","6","7","8","9","10","J","Q","K"];
-const players = JSON.parse(localStorage.getItem("players")) || [];
-
-const headerRow = document.getElementById("headerRow");
-const scoreBody = document.getElementById("scoreBody");
-
-function save() {
-  localStorage.setItem("players", JSON.stringify(players));
-}
-
-function addPlayer() {
-  if (players.length >= 6) {
-    alert("Maximum 6 players.");
-    return;
-  }
-  const name = prompt("Player name:");
-  if (!name) return;
-
-  players.push({ name, scores: Array(11).fill("") });
-  save();
-  render();
-}
-
-function calculateTotal(player) {
-  return player.scores.reduce((s,v) => s + (Number(v) || 0), 0);
-}
-
-function render() {
-  headerRow.innerHTML = "<th>Round</th>";
-
-  const totals = players.map(p => calculateTotal(p));
-  const lowest = totals.length ? Math.min(...totals) : null;
-
-  players.forEach((p, i) => {
-    const th = document.createElement("th");
-    th.textContent = p.name;
-
-    if (totals[i] === lowest && lowest > 0) {
-      th.classList.add("winner");
-    }
-
-    headerRow.appendChild(th);
-  });
-
-  scoreBody.innerHTML = "";
-
-  rounds.forEach((round, r) => {
-    const row = document.createElement("tr");
-    const label = document.createElement("td");
-    label.textContent = round;
-    row.appendChild(label);
-
-    players.forEach((p, i) => {
-      const cell = document.createElement("td");
-      const input = document.createElement("input");
-
-      input.type = "number";
-      input.inputMode = "numeric";
-      input.pattern = "[0-9]*";
-      input.value = p.scores[r];
-
-      input.addEventListener("keydown", e => {
-        if (e.key === "Enter") {
-          p.scores[r] = input.value;
-          save();
-          render();
-          input.blur();
-        }
-      });
-
-      cell.appendChild(input);
-      row.appendChild(cell);
-    });
-
-    scoreBody.appendChild(row);
-  });
-
-  const totalRow = document.createElement("tr");
-  const totalLabel = document.createElement("td");
-  totalLabel.textContent = "TOTAL";
-  totalRow.appendChild(totalLabel);
-
-  players.forEach(p => {
-    const td = document.createElement("td");
-    td.textContent = calculateTotal(p);
-    td.className = "total";
-    totalRow.appendChild(td);
-  });
-
-  scoreBody.appendChild(totalRow);
-}
-
-function playAgain() {
-  players.forEach(p => p.scores = Array(11).fill(""));
-  save();
-  render();
-}
-
-function resetGame() {
-  if (!confirm("Reset everything?")) return;
-  players.length = 0;
-  localStorage.clear();
   render();
 }
 
