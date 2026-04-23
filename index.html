@@ -150,7 +150,7 @@ function render() {
 
   const lowest = getLowest();
 
-  // HEADER (with drag)
+  // HEADER (drag works)
   players.forEach((p, i) => {
     const th = document.createElement("th");
     th.textContent = p.name;
@@ -177,7 +177,6 @@ function render() {
     });
 
     const total = calculateTotal(p);
-
     if (total === lowest && lowest !== null) {
       th.classList.add("winner");
     }
@@ -185,9 +184,9 @@ function render() {
     headerRow.appendChild(th);
   });
 
-  // BODY
   scoreBody.innerHTML = "";
 
+  // BODY
   rounds.forEach((round, r) => {
     const row = document.createElement("tr");
 
@@ -202,9 +201,29 @@ function render() {
       input.type = "number";
       input.value = p.scores[r] ?? "";
 
+      // ✅ FIX: no render here
       input.addEventListener("input", () => {
         players[i].scores[r] = input.value;
         save();
+      });
+
+      // ✅ Move to next input on Enter
+      input.addEventListener("keydown", e => {
+        if (e.key === "Enter") {
+          const inputs = Array.from(document.querySelectorAll("input"));
+          const index = inputs.indexOf(input);
+
+          if (inputs[index + 1]) {
+            inputs[index + 1].focus();
+          }
+
+          input.blur();
+          render(); // update totals AFTER moving
+        }
+      });
+
+      // ✅ Also update when leaving field
+      input.addEventListener("blur", () => {
         render();
       });
 
