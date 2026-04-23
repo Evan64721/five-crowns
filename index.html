@@ -87,6 +87,84 @@ input {
   font-size: 1rem;
   text-align: right;
 }
+
+/* ── Rank badges ── */
+.rank-badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: bold;
+  border-radius: 20px;
+  padding: 1px 6px;
+  margin-left: 4px;
+  vertical-align: middle;
+  letter-spacing: 0.03em;
+}
+.rank-1 { background: #ffd700; color: #5a3e00; }
+.rank-2 { background: #c0c0c0; color: #333; }
+.rank-3 { background: #cd7f32; color: #fff; }
+.rank-other { background: #ddd; color: #555; }
+
+/* ── Round completion ── */
+tr.round-complete td:first-child::after {
+  content: " ✓";
+  color: #4caf50;
+  font-size: 0.8em;
+}
+tr.round-complete {
+  opacity: 0.72;
+}
+tr.round-active td:first-child {
+  font-weight: bold;
+  color: #1a237e;
+  border-left: 3px solid #7c4dff;
+}
+
+/* ── Touch reorder context menu ── */
+#reorder-menu {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+  padding: 6px 0;
+  min-width: 170px;
+  color: #222;
+  font-family: Arial, sans-serif;
+  font-size: 0.95rem;
+}
+#reorder-menu.open { display: block; }
+#reorder-menu .menu-title {
+  padding: 6px 14px 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid #eee;
+  margin-bottom: 4px;
+}
+#reorder-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #222;
+  font-weight: normal;
+  border-radius: 0;
+}
+#reorder-menu button:hover { background: #f0eeff; }
+#reorder-menu button:disabled { color: #bbb; cursor: default; }
+#reorder-menu .menu-sep {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 4px 0;
+}
 </style>
 </head>
 
@@ -107,6 +185,15 @@ input {
   </table>
 </div>
 
+<!-- Touch-friendly reorder context menu -->
+<div id="reorder-menu">
+  <div class="menu-title" id="menu-player-name">Player</div>
+  <button id="menu-left">← Move Left</button>
+  <button id="menu-right">Move Right →</button>
+  <hr class="menu-sep">
+  <button id="menu-close" style="color:#888">Cancel</button>
+</div>
+
 <script>
 const rounds = ["3","4","5","6","7","8","9","10","J","Q","K"];
 
@@ -115,28 +202,73 @@ let players = JSON.parse(localStorage.getItem("players")) || [];
 const thead = document.getElementById("thead");
 const tbody = document.getElementById("tbody");
 
+// ── Reorder menu state ──
+const reorderMenu = document.getElementById("reorder-menu");
+let menuTargetIndex = null;
+
+function closeMenu() {
+  reorderMenu.classList.remove("open");
+  menuTargetIndex = null;
+}
+
+document.getElementById("menu-close").addEventListener("click", closeMenu);
+document.addEventListener("click", e => {
+  if (!reorderMenu.contains(e.target)) closeMenu();
+});
+
+document.getElementById("menu-left").addEventListener("click", () => {
+  if (menuTargetIndex === null || menuTargetIndex === 0) return;
+  const tmp = players[menuTargetIndex];
+  players[menuTargetIndex] = players[menuTargetIndex - 1];
+  players[menuTargetIndex - 1] = tmp;
+  save(); render(); closeMenu();
+});
+
+document.getElementById("menu-right").addEventListener("click", () => {
+  if (menuTargetIndex === null || menuTargetIndex >= players.length - 1) return;
+  const tmp = players[menuTargetIndex];
+  players[menuTargetIndex] = players[menuTargetIndex + 1];
+  players[menuTargetIndex + 1] = tmp;
+  save(); render(); closeMenu();
+});
+
+function openReorderMenu(index, anchorEl) {
+  menuTargetIndex = index;
+  document.getElementById("menu-player-name").textContent = players[index].name;
+  document.getElementById("menu-left").disabled = index === 0;
+  document.getElementById("menu-right").disabled = index === players.length - 1;
+
+  const rect = anchorEl.getBoundingClientRect();
+  reorderMenu.style.top = (rect.bottom + 6 + window.scrollY) + "px";
+  reorderMenu.style.left = Math.min(rect.left, window.innerWidth - 180) + "px";
+  reorderMenu.classList.add("open");
+}
+
 function save() {
   localStorage.setItem("players", JSON.stringify(players));
 }
 
 function calculateTotal(p) {
-  return p.scores.reduce((a,v) => a + (Number(v) || 0), 0);
+  return p.scores.reduce((a, v) => a + (Number(v) || 0), 0);
+}
+
+function getRanks() {
+  if (!players.length) return [];
+  const totals = players.map(calculateTotal);
+  const sorted = [...totals].sort((a, b) => a - b);
+  return totals.map(t => sorted.indexOf(t) + 1);
 }
 
 function getLowest() {
   const totals = players.map(calculateTotal);
-  return totals.length ? Math.min(...totals) : null;
+  const anyFilled = players.some(p => p.scores.some(s => s !== ""));
+  return anyFilled ? Math.min(...totals) : null;
 }
 
 function addPlayer() {
   const name = prompt("Player name?");
   if (!name) return;
-
-  players.push({
-    name,
-    scores: Array(11).fill("")
-  });
-
+  players.push({ name, scores: Array(11).fill("") });
   save();
   render();
 }
@@ -144,9 +276,9 @@ function addPlayer() {
 function updateCell(i, r, value) {
   players[i].scores[r] = value;
   save();
-
-  // only update totals (NO full re-render)
   renderTotals();
+  updateRoundRowClasses();
+  updateHeaderRanks();
 }
 
 function render() {
@@ -157,35 +289,60 @@ function render() {
 
 function renderHeader() {
   thead.innerHTML = "";
-
   const row = document.createElement("tr");
 
   const roundCell = document.createElement("th");
   roundCell.textContent = "Round";
   row.appendChild(roundCell);
 
+  const ranks = getRanks();
+
   players.forEach((p, i) => {
     const th = document.createElement("th");
-    th.textContent = p.name;
-    th.draggable = true;
+    th.style.cursor = "pointer";
+    th.title = "Long-press or click to reorder";
 
-    th.addEventListener("dragstart", e => {
-      e.dataTransfer.setData("from", i);
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = p.name;
+    th.appendChild(nameSpan);
+
+    const anyFilled = players.some(pl => pl.scores.some(s => s !== ""));
+    if (anyFilled) {
+      const badge = document.createElement("span");
+      const rank = ranks[i];
+      badge.className = "rank-badge " +
+        (rank === 1 ? "rank-1" : rank === 2 ? "rank-2" : rank === 3 ? "rank-3" : "rank-other");
+      badge.textContent = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `#${rank}`;
+      badge.title = `Rank ${rank}`;
+      th.appendChild(badge);
+    }
+
+    let pressTimer = null;
+
+    th.addEventListener("mousedown", () => {
+      pressTimer = setTimeout(() => openReorderMenu(i, th), 500);
     });
+    th.addEventListener("mouseup", () => clearTimeout(pressTimer));
+    th.addEventListener("mouseleave", () => clearTimeout(pressTimer));
 
+    th.addEventListener("touchstart", e => {
+      pressTimer = setTimeout(() => {
+        e.preventDefault();
+        openReorderMenu(i, th);
+      }, 500);
+    }, { passive: false });
+    th.addEventListener("touchend", () => clearTimeout(pressTimer));
+    th.addEventListener("touchmove", () => clearTimeout(pressTimer));
+
+    th.draggable = true;
+    th.addEventListener("dragstart", e => e.dataTransfer.setData("from", i));
     th.addEventListener("dragover", e => e.preventDefault());
-
     th.addEventListener("drop", e => {
       const from = Number(e.dataTransfer.getData("from"));
-      const to = i;
-
-      if (from === to) return;
-
+      if (from === i) return;
       const moved = players.splice(from, 1)[0];
-      players.splice(to, 0, moved);
-
-      save();
-      render();
+      players.splice(i, 0, moved);
+      save(); render();
     });
 
     row.appendChild(th);
@@ -199,6 +356,7 @@ function renderBody() {
 
   rounds.forEach((r, rowIndex) => {
     const row = document.createElement("tr");
+    row.dataset.roundIndex = rowIndex;
 
     const label = document.createElement("td");
     label.textContent = r;
@@ -206,9 +364,10 @@ function renderBody() {
 
     players.forEach((p, playerIndex) => {
       const cell = document.createElement("td");
-
       const input = document.createElement("input");
       input.type = "number";
+      input.min = "0";
+      input.step = "1";
       input.value = p.scores[rowIndex] ?? "";
 
       input.addEventListener("input", () => {
@@ -218,8 +377,8 @@ function renderBody() {
       input.addEventListener("keydown", e => {
         if (e.key === "Enter") {
           const inputs = [...document.querySelectorAll("input")];
-          const i = inputs.indexOf(input);
-          if (inputs[i + 1]) inputs[i + 1].focus();
+          const idx = inputs.indexOf(input);
+          if (inputs[idx + 1]) inputs[idx + 1].focus();
           input.blur();
         }
       });
@@ -230,6 +389,28 @@ function renderBody() {
 
     tbody.appendChild(row);
   });
+
+  updateRoundRowClasses();
+}
+
+function updateRoundRowClasses() {
+  const rows = tbody.querySelectorAll("tr[data-round-index]");
+  rows.forEach(row => {
+    const inputs = [...row.querySelectorAll("input")];
+    const allFilled = inputs.length > 0 && inputs.every(inp => inp.value !== "");
+    const anyFilled = inputs.some(inp => inp.value !== "");
+
+    row.classList.remove("round-complete", "round-active");
+    if (allFilled) {
+      row.classList.add("round-complete");
+    } else if (anyFilled) {
+      row.classList.add("round-active");
+    }
+  });
+}
+
+function updateHeaderRanks() {
+  renderHeader();
 }
 
 function renderTotals() {
@@ -237,7 +418,6 @@ function renderTotals() {
   if (old) old.remove();
 
   const lowest = getLowest();
-
   const row = document.createElement("tr");
   row.id = "totalsRow";
 
@@ -248,14 +428,9 @@ function renderTotals() {
   players.forEach(p => {
     const td = document.createElement("td");
     const total = calculateTotal(p);
-
     td.textContent = total;
     td.className = "total";
-
-    if (total === lowest && lowest !== null) {
-      td.classList.add("winner");
-    }
-
+    if (total === lowest && lowest !== null) td.classList.add("winner");
     row.appendChild(td);
   });
 
