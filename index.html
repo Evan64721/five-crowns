@@ -53,8 +53,7 @@ th, td {
   text-align: right;
 }
 
-th:first-child,
-td:first-child {
+th:first-child, td:first-child {
   text-align: left;
   font-weight: bold;
 }
@@ -65,29 +64,44 @@ th {
   top: 0;
 }
 
-.total { background: #ffe082; font-weight: bold; }
+/* ── Avatars ── */
+.player-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
 
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #7c4dff, #4b2e83);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
+  font-size: 0.9rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* ── Crown (LIVE MOVES) ── */
+.crown {
+  position: absolute;
+  top: -14px;
+  font-size: 1.3rem;
+  transition: left 0.4s ease, top 0.4s ease;
+}
+
+/* ── Winner glow ── */
 .winner {
   background: #ff4d4d !important;
   color: white;
 }
 
-/* ── Winner crown ── */
-.player-header { position: relative; }
-
-.crown {
-  position: absolute;
-  top: -18px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 1.4rem;
-  animation: crownBob 0.9s ease-in-out infinite;
-}
-
-@keyframes crownBob {
-  0%,100% { transform: translateX(-50%) translateY(0) scale(1); }
-  50% { transform: translateX(-50%) translateY(-6px) scale(1.15); }
-}
+.total { background: #ffe082; font-weight: bold; }
 
 input {
   width: 100%;
@@ -95,18 +109,35 @@ input {
   text-align: right;
 }
 
-.rank-badge {
-  display: inline-block;
-  font-size: 0.65rem;
-  font-weight: bold;
-  border-radius: 20px;
-  padding: 1px 6px;
-  margin-left: 4px;
+/* ── Win screen ── */
+.win-screen {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.8);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: white;
+  z-index: 9999;
 }
-.rank-1 { background: #ffd700; }
-.rank-2 { background: #c0c0c0; }
-.rank-3 { background: #cd7f32; }
-.rank-other { background: #ddd; }
+
+.win-box {
+  background: #4b2e83;
+  padding: 20px;
+  border-radius: 14px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.win-box h2 {
+  margin: 0 0 10px;
+}
+
+.rank-badge {
+  font-size: 0.7rem;
+  margin-top: 4px;
+}
 </style>
 </head>
 
@@ -116,10 +147,9 @@ input {
 
 <div class="controls">
   <button onclick="addPlayer()">Add Player</button>
+  <button onclick="undo()">Undo</button>
   <button onclick="playAgain()">Play Again</button>
   <button onclick="resetGame()">Reset</button>
-  <button onclick="exportPlayers()">Export</button>
-  <button onclick="importPlayers()">Import</button>
 </div>
 
 <div class="table-wrapper">
@@ -129,10 +159,19 @@ input {
   </table>
 </div>
 
+<!-- WIN SCREEN -->
+<div class="win-screen" id="winScreen">
+  <div class="win-box">
+    <h2 id="winnerText">Winner</h2>
+    <button onclick="playAgain()">Play Again</button>
+  </div>
+</div>
+
 <script>
 const rounds = ["3","4","5","6","7","8","9","10","J","Q","K"];
 
 let players = JSON.parse(localStorage.getItem("players")) || [];
+let history = [];
 
 const thead = document.getElementById("thead");
 const tbody = document.getElementById("tbody");
@@ -141,139 +180,129 @@ function save() {
   localStorage.setItem("players", JSON.stringify(players));
 }
 
+/* ── Undo ── */
+function undo() {
+  const last = history.pop();
+  if (!last) return;
+
+  players[last.p].scores[last.r] = last.old;
+  save();
+  render();
+}
+
+/* ── Winner logic ── */
 function calculateTotal(p) {
-  return p.scores.reduce((a, v) => a + (Number(v) || 0), 0);
+  return p.scores.reduce((a,v)=>a+(Number(v)||0),0);
 }
 
-function calcAverage(p) {
-  const vals = p.scores.map(Number).filter(v => !isNaN(v));
-  if (!vals.length) return null;
-  return Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
-}
-
-function getWinningIndex() {
+function getWinnerIndex() {
   if (!players.length) return null;
-  if (!players.some(p => p.scores.some(s => s !== ""))) return null;
 
-  let lowest = Infinity;
-  let winner = null;
+  const filled = players.every(p => p.scores.every(s => s !== ""));
+  if (!filled) return null;
 
-  players.forEach((p, i) => {
+  let best = Infinity;
+  let win = null;
+
+  players.forEach((p,i)=>{
     const t = calculateTotal(p);
-    if (t < lowest) {
-      lowest = t;
-      winner = i;
+    if (t < best) {
+      best = t;
+      win = i;
     }
   });
 
-  return winner;
+  return win;
 }
 
-function getRanks() {
-  const totals = players.map(calculateTotal);
-  const sorted = [...totals].sort((a,b)=>a-b);
-  return totals.map(t => sorted.indexOf(t)+1);
-}
-
-function getLowest() {
-  const totals = players.map(calculateTotal);
-  const anyFilled = players.some(p => p.scores.some(s => s !== ""));
-  return anyFilled ? Math.min(...totals) : null;
-}
-
+/* ── Add player ── */
 function addPlayer() {
   const name = prompt("Player name?");
   if (!name) return;
 
   players.push({
     name,
-    scores: Array(11).fill(""),
-    avg: null,
-    photo: null
+    scores: Array(11).fill("")
   });
 
   save();
   render();
 }
 
-function updateCell(i, r, value) {
-  players[i].scores[r] = value;
-  players[i].avg = calcAverage(players[i]);
+/* ── Update score with history ── */
+function updateScore(p, r, val) {
+  history.push({ p, r, old: players[p].scores[r] });
+  players[p].scores[r] = val;
   save();
   render();
 }
 
+/* ── Render ── */
 function render() {
   renderHeader();
   renderBody();
-  renderTotals();
+  checkWin();
 }
 
+/* ── Header with live crown movement ── */
 function renderHeader() {
   thead.innerHTML = "";
   const row = document.createElement("tr");
 
-  const rc = document.createElement("th");
-  rc.textContent = "Round";
-  row.appendChild(rc);
+  row.appendChild(document.createElement("th"));
 
-  const ranks = getRanks();
-  const winnerIndex = getWinningIndex();
+  const winner = getWinnerIndex();
 
-  players.forEach((p, i) => {
+  players.forEach((p,i)=>{
     const th = document.createElement("th");
-    th.classList.add("player-header");
+
+    const wrap = document.createElement("div");
+    wrap.className = "player-head";
+
+    const avatar = document.createElement("div");
+    avatar.className = "avatar";
+    avatar.textContent = p.name.charAt(0).toUpperCase();
 
     const name = document.createElement("div");
     name.textContent = p.name;
-    th.appendChild(name);
 
-    if (p.avg !== null) {
-      const avg = document.createElement("div");
-      avg.style.fontSize = "0.7rem";
-      avg.textContent = "avg " + p.avg;
-      th.appendChild(avg);
-    }
+    wrap.appendChild(avatar);
+    wrap.appendChild(name);
 
-    if (i === winnerIndex) {
+    /* LIVE crown movement */
+    if (i === winner) {
       const crown = document.createElement("div");
       crown.className = "crown";
       crown.textContent = "👑";
-      th.appendChild(crown);
+      wrap.appendChild(crown);
     }
 
-    const badge = document.createElement("span");
-    const rank = ranks[i];
-    badge.className = "rank-badge " +
-      (rank===1?"rank-1":rank===2?"rank-2":rank===3?"rank-3":"rank-other");
-    badge.textContent = rank===1?"🥇":rank===2?"🥈":rank===3?"🥉":`#${rank}`;
-    th.appendChild(badge);
-
+    th.appendChild(wrap);
     row.appendChild(th);
   });
 
   thead.appendChild(row);
 }
 
+/* ── Body ── */
 function renderBody() {
   tbody.innerHTML = "";
 
-  rounds.forEach((r, ri) => {
+  rounds.forEach((r,ri)=>{
     const row = document.createElement("tr");
 
     const label = document.createElement("td");
     label.textContent = r;
     row.appendChild(label);
 
-    players.forEach((p, pi) => {
+    players.forEach((p,pi)=>{
       const td = document.createElement("td");
-      const input = document.createElement("input");
 
-      input.type = "number";
+      const input = document.createElement("input");
       input.value = p.scores[ri] || "";
 
-      input.addEventListener("input", () => {
-        updateCell(pi, ri, input.value);
+      input.addEventListener("input",()=>{
+        updateScore(pi,ri,input.value);
       });
 
       td.appendChild(input);
@@ -282,62 +311,56 @@ function renderBody() {
 
     tbody.appendChild(row);
   });
-}
 
-function renderTotals() {
-  const lowest = getLowest();
+  /* totals */
+  const lowest = Math.min(...players.map(calculateTotal));
 
-  const row = document.createElement("tr");
-  const label = document.createElement("td");
-  label.textContent = "TOTAL";
-  row.appendChild(label);
+  const tr = document.createElement("tr");
+  tr.appendChild(Object.assign(document.createElement("td"),{textContent:"TOTAL"}));
 
-  players.forEach(p => {
+  players.forEach(p=>{
     const td = document.createElement("td");
     const t = calculateTotal(p);
     td.textContent = t;
     td.className = "total";
-    if (t === lowest && lowest !== null) td.classList.add("winner");
-    row.appendChild(td);
+    if (t === lowest) td.classList.add("winner");
+    tr.appendChild(td);
   });
 
-  tbody.appendChild(row);
+  tbody.appendChild(tr);
 }
 
+/* ── Win screen ── */
+function checkWin() {
+  const done = players.length &&
+    players.every(p => p.scores.every(s => s !== ""));
+
+  if (!done) return;
+
+  const winner = getWinnerIndex();
+  if (winner === null) return;
+
+  document.getElementById("winnerText").textContent =
+    "🏆 Winner: " + players[winner].name;
+
+  document.getElementById("winScreen").style.display = "flex";
+}
+
+/* ── Reset / replay ── */
 function playAgain() {
-  players.forEach(p => p.scores = Array(11).fill(""));
+  players.forEach(p=>p.scores=Array(11).fill(""));
+  history = [];
   save();
+  document.getElementById("winScreen").style.display = "none";
   render();
 }
 
 function resetGame() {
-  if (!confirm("Reset everything?")) return;
   players = [];
+  history = [];
   localStorage.removeItem("players");
+  document.getElementById("winScreen").style.display = "none";
   render();
-}
-
-function exportPlayers() {
-  prompt("Copy this:", JSON.stringify(players));
-}
-
-function importPlayers() {
-  const code = prompt("Paste code:");
-  if (!code) return;
-
-  try {
-    const parsed = JSON.parse(code);
-    players = parsed.map(p => ({
-      name: p.name || "Player",
-      scores: p.scores || Array(11).fill(""),
-      avg: p.avg || null,
-      photo: p.photo || null
-    }));
-    save();
-    render();
-  } catch {
-    alert("Invalid code");
-  }
 }
 
 render();
