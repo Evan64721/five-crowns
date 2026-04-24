@@ -18,10 +18,7 @@ body {
   flex-direction: column;
 }
 
-h1 {
-  text-align: center;
-  margin: 10px 0;
-}
+h1 { text-align: center; margin: 10px 0; }
 
 .controls {
   display: flex;
@@ -40,11 +37,7 @@ button {
   cursor: pointer;
 }
 
-.table-wrapper {
-  flex: 1;
-  overflow: auto;
-  padding: 6px;
-}
+.table-wrapper { flex: 1; overflow: auto; padding: 6px; }
 
 table {
   width: 100%;
@@ -72,14 +65,28 @@ th {
   top: 0;
 }
 
-.total {
-  background: #ffe082;
-  font-weight: bold;
-}
+.total { background: #ffe082; font-weight: bold; }
 
 .winner {
   background: #ff4d4d !important;
   color: white;
+}
+
+/* ── Winner crown ── */
+.player-header { position: relative; }
+
+.crown {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 1.4rem;
+  animation: crownBob 0.9s ease-in-out infinite;
+}
+
+@keyframes crownBob {
+  0%,100% { transform: translateX(-50%) translateY(0) scale(1); }
+  50% { transform: translateX(-50%) translateY(-6px) scale(1.15); }
 }
 
 input {
@@ -88,7 +95,6 @@ input {
   text-align: right;
 }
 
-/* ── Rank badges ── */
 .rank-badge {
   display: inline-block;
   font-size: 0.65rem;
@@ -96,75 +102,11 @@ input {
   border-radius: 20px;
   padding: 1px 6px;
   margin-left: 4px;
-  vertical-align: middle;
-  letter-spacing: 0.03em;
 }
-.rank-1 { background: #ffd700; color: #5a3e00; }
-.rank-2 { background: #c0c0c0; color: #333; }
-.rank-3 { background: #cd7f32; color: #fff; }
-.rank-other { background: #ddd; color: #555; }
-
-/* ── Round completion ── */
-tr.round-complete td:first-child::after {
-  content: " ✓";
-  color: #4caf50;
-  font-size: 0.8em;
-}
-tr.round-complete {
-  opacity: 0.72;
-}
-tr.round-active td:first-child {
-  font-weight: bold;
-  color: #1a237e;
-  border-left: 3px solid #7c4dff;
-}
-
-/* ── Touch reorder context menu ── */
-#reorder-menu {
-  display: none;
-  position: fixed;
-  z-index: 9999;
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 10px;
-  box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-  padding: 6px 0;
-  min-width: 170px;
-  color: #222;
-  font-family: Arial, sans-serif;
-  font-size: 0.95rem;
-}
-#reorder-menu.open { display: block; }
-#reorder-menu .menu-title {
-  padding: 6px 14px 4px;
-  font-size: 0.75rem;
-  font-weight: bold;
-  color: #888;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-bottom: 1px solid #eee;
-  margin-bottom: 4px;
-}
-#reorder-menu button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 8px 14px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  color: #222;
-  font-weight: normal;
-  border-radius: 0;
-}
-#reorder-menu button:hover { background: #f0eeff; }
-#reorder-menu button:disabled { color: #bbb; cursor: default; }
-#reorder-menu .menu-sep {
-  border: none;
-  border-top: 1px solid #eee;
-  margin: 4px 0;
-}
+.rank-1 { background: #ffd700; }
+.rank-2 { background: #c0c0c0; }
+.rank-3 { background: #cd7f32; }
+.rank-other { background: #ddd; }
 </style>
 </head>
 
@@ -176,22 +118,15 @@ tr.round-active td:first-child {
   <button onclick="addPlayer()">Add Player</button>
   <button onclick="playAgain()">Play Again</button>
   <button onclick="resetGame()">Reset</button>
+  <button onclick="exportPlayers()">Export</button>
+  <button onclick="importPlayers()">Import</button>
 </div>
 
 <div class="table-wrapper">
-  <table id="table">
+  <table>
     <thead id="thead"></thead>
     <tbody id="tbody"></tbody>
   </table>
-</div>
-
-<!-- Touch-friendly reorder context menu -->
-<div id="reorder-menu">
-  <div class="menu-title" id="menu-player-name">Player</div>
-  <button id="menu-left">← Move Left</button>
-  <button id="menu-right">Move Right →</button>
-  <hr class="menu-sep">
-  <button id="menu-close" style="color:#888">Cancel</button>
 </div>
 
 <script>
@@ -202,48 +137,6 @@ let players = JSON.parse(localStorage.getItem("players")) || [];
 const thead = document.getElementById("thead");
 const tbody = document.getElementById("tbody");
 
-// ── Reorder menu state ──
-const reorderMenu = document.getElementById("reorder-menu");
-let menuTargetIndex = null;
-
-function closeMenu() {
-  reorderMenu.classList.remove("open");
-  menuTargetIndex = null;
-}
-
-document.getElementById("menu-close").addEventListener("click", closeMenu);
-document.addEventListener("click", e => {
-  if (!reorderMenu.contains(e.target)) closeMenu();
-});
-
-document.getElementById("menu-left").addEventListener("click", () => {
-  if (menuTargetIndex === null || menuTargetIndex === 0) return;
-  const tmp = players[menuTargetIndex];
-  players[menuTargetIndex] = players[menuTargetIndex - 1];
-  players[menuTargetIndex - 1] = tmp;
-  save(); render(); closeMenu();
-});
-
-document.getElementById("menu-right").addEventListener("click", () => {
-  if (menuTargetIndex === null || menuTargetIndex >= players.length - 1) return;
-  const tmp = players[menuTargetIndex];
-  players[menuTargetIndex] = players[menuTargetIndex + 1];
-  players[menuTargetIndex + 1] = tmp;
-  save(); render(); closeMenu();
-});
-
-function openReorderMenu(index, anchorEl) {
-  menuTargetIndex = index;
-  document.getElementById("menu-player-name").textContent = players[index].name;
-  document.getElementById("menu-left").disabled = index === 0;
-  document.getElementById("menu-right").disabled = index === players.length - 1;
-
-  const rect = anchorEl.getBoundingClientRect();
-  reorderMenu.style.top = (rect.bottom + 6 + window.scrollY) + "px";
-  reorderMenu.style.left = Math.min(rect.left, window.innerWidth - 180) + "px";
-  reorderMenu.classList.add("open");
-}
-
 function save() {
   localStorage.setItem("players", JSON.stringify(players));
 }
@@ -252,11 +145,34 @@ function calculateTotal(p) {
   return p.scores.reduce((a, v) => a + (Number(v) || 0), 0);
 }
 
+function calcAverage(p) {
+  const vals = p.scores.map(Number).filter(v => !isNaN(v));
+  if (!vals.length) return null;
+  return Math.round(vals.reduce((a,b)=>a+b,0) / vals.length);
+}
+
+function getWinningIndex() {
+  if (!players.length) return null;
+  if (!players.some(p => p.scores.some(s => s !== ""))) return null;
+
+  let lowest = Infinity;
+  let winner = null;
+
+  players.forEach((p, i) => {
+    const t = calculateTotal(p);
+    if (t < lowest) {
+      lowest = t;
+      winner = i;
+    }
+  });
+
+  return winner;
+}
+
 function getRanks() {
-  if (!players.length) return [];
   const totals = players.map(calculateTotal);
-  const sorted = [...totals].sort((a, b) => a - b);
-  return totals.map(t => sorted.indexOf(t) + 1);
+  const sorted = [...totals].sort((a,b)=>a-b);
+  return totals.map(t => sorted.indexOf(t)+1);
 }
 
 function getLowest() {
@@ -268,17 +184,23 @@ function getLowest() {
 function addPlayer() {
   const name = prompt("Player name?");
   if (!name) return;
-  players.push({ name, scores: Array(11).fill("") });
+
+  players.push({
+    name,
+    scores: Array(11).fill(""),
+    avg: null,
+    photo: null
+  });
+
   save();
   render();
 }
 
 function updateCell(i, r, value) {
   players[i].scores[r] = value;
+  players[i].avg = calcAverage(players[i]);
   save();
-  renderTotals();
-  updateRoundRowClasses();
-  updateHeaderRanks();
+  render();
 }
 
 function render() {
@@ -291,59 +213,41 @@ function renderHeader() {
   thead.innerHTML = "";
   const row = document.createElement("tr");
 
-  const roundCell = document.createElement("th");
-  roundCell.textContent = "Round";
-  row.appendChild(roundCell);
+  const rc = document.createElement("th");
+  rc.textContent = "Round";
+  row.appendChild(rc);
 
   const ranks = getRanks();
+  const winnerIndex = getWinningIndex();
 
   players.forEach((p, i) => {
     const th = document.createElement("th");
-    th.style.cursor = "pointer";
-    th.title = "Long-press or click to reorder";
+    th.classList.add("player-header");
 
-    const nameSpan = document.createElement("span");
-    nameSpan.textContent = p.name;
-    th.appendChild(nameSpan);
+    const name = document.createElement("div");
+    name.textContent = p.name;
+    th.appendChild(name);
 
-    const anyFilled = players.some(pl => pl.scores.some(s => s !== ""));
-    if (anyFilled) {
-      const badge = document.createElement("span");
-      const rank = ranks[i];
-      badge.className = "rank-badge " +
-        (rank === 1 ? "rank-1" : rank === 2 ? "rank-2" : rank === 3 ? "rank-3" : "rank-other");
-      badge.textContent = rank === 1 ? "🥇" : rank === 2 ? "🥈" : rank === 3 ? "🥉" : `#${rank}`;
-      badge.title = `Rank ${rank}`;
-      th.appendChild(badge);
+    if (p.avg !== null) {
+      const avg = document.createElement("div");
+      avg.style.fontSize = "0.7rem";
+      avg.textContent = "avg " + p.avg;
+      th.appendChild(avg);
     }
 
-    let pressTimer = null;
+    if (i === winnerIndex) {
+      const crown = document.createElement("div");
+      crown.className = "crown";
+      crown.textContent = "👑";
+      th.appendChild(crown);
+    }
 
-    th.addEventListener("mousedown", () => {
-      pressTimer = setTimeout(() => openReorderMenu(i, th), 500);
-    });
-    th.addEventListener("mouseup", () => clearTimeout(pressTimer));
-    th.addEventListener("mouseleave", () => clearTimeout(pressTimer));
-
-    th.addEventListener("touchstart", e => {
-      pressTimer = setTimeout(() => {
-        e.preventDefault();
-        openReorderMenu(i, th);
-      }, 500);
-    }, { passive: false });
-    th.addEventListener("touchend", () => clearTimeout(pressTimer));
-    th.addEventListener("touchmove", () => clearTimeout(pressTimer));
-
-    th.draggable = true;
-    th.addEventListener("dragstart", e => e.dataTransfer.setData("from", i));
-    th.addEventListener("dragover", e => e.preventDefault());
-    th.addEventListener("drop", e => {
-      const from = Number(e.dataTransfer.getData("from"));
-      if (from === i) return;
-      const moved = players.splice(from, 1)[0];
-      players.splice(i, 0, moved);
-      save(); render();
-    });
+    const badge = document.createElement("span");
+    const rank = ranks[i];
+    badge.className = "rank-badge " +
+      (rank===1?"rank-1":rank===2?"rank-2":rank===3?"rank-3":"rank-other");
+    badge.textContent = rank===1?"🥇":rank===2?"🥈":rank===3?"🥉":`#${rank}`;
+    th.appendChild(badge);
 
     row.appendChild(th);
   });
@@ -354,83 +258,46 @@ function renderHeader() {
 function renderBody() {
   tbody.innerHTML = "";
 
-  rounds.forEach((r, rowIndex) => {
+  rounds.forEach((r, ri) => {
     const row = document.createElement("tr");
-    row.dataset.roundIndex = rowIndex;
 
     const label = document.createElement("td");
     label.textContent = r;
     row.appendChild(label);
 
-    players.forEach((p, playerIndex) => {
-      const cell = document.createElement("td");
+    players.forEach((p, pi) => {
+      const td = document.createElement("td");
       const input = document.createElement("input");
+
       input.type = "number";
-      input.min = "0";
-      input.step = "1";
-      input.value = p.scores[rowIndex] ?? "";
+      input.value = p.scores[ri] || "";
 
       input.addEventListener("input", () => {
-        updateCell(playerIndex, rowIndex, input.value);
+        updateCell(pi, ri, input.value);
       });
 
-      input.addEventListener("keydown", e => {
-        if (e.key === "Enter") {
-          const inputs = [...document.querySelectorAll("input")];
-          const idx = inputs.indexOf(input);
-          if (inputs[idx + 1]) inputs[idx + 1].focus();
-          input.blur();
-        }
-      });
-
-      cell.appendChild(input);
-      row.appendChild(cell);
+      td.appendChild(input);
+      row.appendChild(td);
     });
 
     tbody.appendChild(row);
   });
-
-  updateRoundRowClasses();
-}
-
-function updateRoundRowClasses() {
-  const rows = tbody.querySelectorAll("tr[data-round-index]");
-  rows.forEach(row => {
-    const inputs = [...row.querySelectorAll("input")];
-    const allFilled = inputs.length > 0 && inputs.every(inp => inp.value !== "");
-    const anyFilled = inputs.some(inp => inp.value !== "");
-
-    row.classList.remove("round-complete", "round-active");
-    if (allFilled) {
-      row.classList.add("round-complete");
-    } else if (anyFilled) {
-      row.classList.add("round-active");
-    }
-  });
-}
-
-function updateHeaderRanks() {
-  renderHeader();
 }
 
 function renderTotals() {
-  const old = document.getElementById("totalsRow");
-  if (old) old.remove();
-
   const lowest = getLowest();
-  const row = document.createElement("tr");
-  row.id = "totalsRow";
 
+  const row = document.createElement("tr");
   const label = document.createElement("td");
   label.textContent = "TOTAL";
   row.appendChild(label);
 
   players.forEach(p => {
     const td = document.createElement("td");
-    const total = calculateTotal(p);
-    td.textContent = total;
+    const t = calculateTotal(p);
+    td.textContent = t;
     td.className = "total";
-    if (total === lowest && lowest !== null) td.classList.add("winner");
+    if (t === lowest && lowest !== null) td.classList.add("winner");
     row.appendChild(td);
   });
 
@@ -448,6 +315,29 @@ function resetGame() {
   players = [];
   localStorage.removeItem("players");
   render();
+}
+
+function exportPlayers() {
+  prompt("Copy this:", JSON.stringify(players));
+}
+
+function importPlayers() {
+  const code = prompt("Paste code:");
+  if (!code) return;
+
+  try {
+    const parsed = JSON.parse(code);
+    players = parsed.map(p => ({
+      name: p.name || "Player",
+      scores: p.scores || Array(11).fill(""),
+      avg: p.avg || null,
+      photo: p.photo || null
+    }));
+    save();
+    render();
+  } catch {
+    alert("Invalid code");
+  }
 }
 
 render();
